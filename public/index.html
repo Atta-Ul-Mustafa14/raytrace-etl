@@ -1,0 +1,32 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ray tracing ETL dashboard</title>
+<style>body{font-family:system-ui;max-width:720px;margin:2rem auto;padding:0 1rem}canvas{image-rendering:pixelated}label{display:block;margin:.4rem 0}</style>
+<h1>Ray tracer + ETL dashboard</h1>
+<p>Move the virtual camera. Every pixel is one ray sent to the API.</p>
+<label>Camera height <input id="y" type="range" min="0.5" max="6" step="0.1" value="2"> <span id="yv"></span></label>
+<label>Camera x <input id="x" type="range" min="-4" max="4" step="0.1" value="0"> <span id="xv"></span></label>
+<label>Field of view <input id="f" type="range" min="30" max="110" step="1" value="60"> <span id="fv"></span></label>
+<canvas id="c" width="320" height="320" style="border:1px solid #999"></canvas>
+<p id="s"></p>
+<h2>Hit rate by camera height</h2>
+<div style="max-width:560px"><canvas id="ch"></canvas></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const $ = i => document.getElementById(i);
+async function draw() {
+  const y = $('y').value, x = $('x').value, f = $('f').value;
+  $('yv').textContent = y; $('xv').textContent = x; $('fv').textContent = f;
+  const d = await (await fetch(`/render?cam_x=${x}&cam_y=${y}&cam_z=3&fov=${f}&size=40`)).json();
+  const g = $('c').getContext('2d');
+  d.rays.forEach(r => {
+    const v = Math.round(r.brightness * 255);
+    g.fillStyle = r.hit ? `rgb(${v},${v},${v})` : '#9bc';
+    g.fillRect(r.pixel_x * 8, r.pixel_y * 8, 8, 8);
+  });
+  const h = d.rays.filter(r => r.hit).length;
+  $('s').textContent = `${d.rays.length} rays, hit rate ${(100 * h / d.rays.length).toFixed(1)}%`;
+}
+['y', 'x', 'f'].forEach(i => $(i).oninput = draw);
+draw();
+fetch('/experiment').then(r => r.json()).then(e => new Chart($('ch'), {type: 'line',
+  data: {labels: e.map(p => p.cam_y), datasets: [{label: 'Hit rate', data: e.map(p => p.hit_rate)}]}}));
+</script>
